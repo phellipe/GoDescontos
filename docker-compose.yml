@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: godescontos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: godescontos
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and queues
+  redis:
+    image: redis:7-alpine
+    container_name: godescontos-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: godescontos-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@godescontos.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - '5050:80'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: godescontos-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/godescontos?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-jwt-secret-change-in-production-32chars-min
+      JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production-32chars-min
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      BCRYPT_ROUNDS: 10
+      CORS_ORIGIN: http://localhost:5173,http://localhost:19006
+      STRIPE_SECRET_KEY: sk_test_your_key_here
+      STRIPE_WEBHOOK_SECRET: whsec_your_secret_here
+      STRIPE_SUCCESS_URL: http://localhost:5173/payment/success
+      STRIPE_CANCEL_URL: http://localhost:5173/payment/cancel
+      EMAIL_FROM: noreply@godescontos.com
+      EMAIL_HOST: smtp.example.com
+      EMAIL_PORT: 587
+      EMAIL_USER: user
+      EMAIL_PASSWORD: password
+      ADMIN_EMAIL: admin@godescontos.com
+      ADMIN_PASSWORD: Admin123!@#
+      WEB_URL: http://localhost:5173
+      MOBILE_URL: exp://localhost:19000
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm run dev"
+
+  # Background Worker
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: godescontos-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/godescontos?schema=public
+    volumes:
+      - ./worker:/app
+      - /app/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    command: npm run dev
+
+  # Web Frontend
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: builder
+    container_name: godescontos-web
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:3000/api
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
+  pgadmin_data:
+
+networks:
+  default:
+    name: godescontos-network

@@ -1,0 +1,412 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  MERCHANT
+  ADMIN
+}
+
+enum CampaignStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PUBLISHED
+  ENDED
+  CANCELLED
+}
+
+enum CouponStatus {
+  AVAILABLE
+  RESERVED
+  REDEEMED
+  EXPIRED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  UNPAID
+  TRIALING
+}
+
+enum NotificationType {
+  NEW_CAMPAIGN
+  CAMPAIGN_EXPIRING
+  COUPON_REDEEMED
+  PAYMENT_CONFIRMED
+  MERCHANT_APPROVED
+  GENERAL
+}
+
+enum Platform {
+  WEB
+  IOS
+  ANDROID
+  EXPO
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String
+  name              String
+  role              UserRole  @default(USER)
+  isEmailVerified   Boolean   @default(false)
+  emailVerifiedAt   DateTime?
+  verificationToken String?
+  resetPasswordToken String?
+  resetPasswordExpires DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastLoginAt       DateTime?
+
+  // Relations
+  merchant          Merchant?
+  coupons           Coupon[]
+  refreshTokens     RefreshToken[]
+  pushTokens        PushToken[]
+  notifications     Notification[]
+  favorites         Favorite[]
+  customerProfiles  Customer[]
+  auditLogs         AuditLog[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Merchant {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  name        String
+  cnpj        String?  @unique
+  address     String?
+  city        String
+  state       String
+  country     String   @default("BR")
+  zipCode     String?
+  phone       String?
+  description String?  @db.Text
+  logoUrl     String?
+  website     String?
+  isApproved  Boolean  @default(false)
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns   Campaign[]
+  payments    Payment[]
+  subscriptions Subscription[]
+  customers   Customer[]
+
+  @@index([city, state])
+  @@index([userId])
+  @@index([isApproved])
+  @@map("merchants")
+}
+
+model Customer {
+  id         String   @id @default(uuid())
+  merchantId String
+  userId     String?
+  email      String
+  name       String
+  phone      String?
+  isActive   Boolean  @default(true)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([merchantId, email])
+  @@index([merchantId])
+  @@index([email])
+  @@map("customers")
+}
+
+model Campaign {
+  id                String         @id @default(uuid())
+  merchantId        String
+  title             String
+  slug              String         @unique
+  description       String         @db.Text
+  shortDescription  String?
+  priceOriginal     Decimal        @db.Decimal(10, 2)
+  pricePromo        Decimal        @db.Decimal(10, 2)
+  discountPercent   Int
+  category          String
+  tags              String[]
+  imageUrl          String?
+  images            String[]
+  startAt           DateTime
+  endAt             DateTime
+  totalQuantity     Int
+  redeemedQuantity  Int            @default(0)
+  viewCount         Int            @default(0)
+  favoriteCount     Int            @default(0)
+  status            CampaignStatus @default(DRAFT)
+  terms             String?        @db.Text
+  city              String
+  state             String
+  country           String         @default("BR")
+  location          String?
+  latitude          Decimal?       @db.Decimal(10, 8)
+  longitude         Decimal?       @db.Decimal(11, 8)
+  isPaid            Boolean        @default(false)
+  isFeatured        Boolean        @default(false)
+  metadata          Json?
+  publishedAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Relations
+  merchant          Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  coupons           Coupon[]
+  favorites         Favorite[]
+  payments          Payment[]
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([category])
+  @@index([startAt, endAt])
+  @@index([city, state])
+  @@index([city, state, category])
+  @@fulltext([title, description])
+  @@map("campaigns")
+}
+
+model Coupon {
+  id          String       @id @default(uuid())
+  campaignId  String
+  code        String       @unique
+  userId      String?
+  qrCodeUrl   String?
+  status      CouponStatus @default(AVAILABLE)
+  issuedAt    DateTime     @default(now())
+  reservedAt  DateTime?
+  redeemedAt  DateTime?
+  redeemedBy  String?
+  expiresAt   DateTime
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId])
+  @@index([userId])
+  @@index([code])
+  @@index([status])
+  @@map("coupons")
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  merchantId        String
+  campaignId        String?
+  subscriptionId    String?
+  stripePaymentId   String        @unique
+  stripeCustomerId  String?
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("BRL")
+  status            PaymentStatus @default(PENDING)
+  paymentMethod     String?
+  description       String?
+  metadata          Json?
+  paidAt            DateTime?
+  refundedAt        DateTime?
+  refundAmount      Decimal?      @db.Decimal(10, 2)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  merchant          Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  campaign          Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([stripePaymentId])
+  @@map("payments")
+}
+
+model Plan {
+  id            String         @id @default(uuid())
+  name          String
+  description   String?        @db.Text
+  stripePriceId String         @unique
+  stripeProductId String       @unique
+  price         Decimal        @db.Decimal(10, 2)
+  currency      String         @default("BRL")
+  interval      String         // 'month' or 'year'
+  features      Json
+  maxCampaigns  Int
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  merchantId           String
+  planId               String
+  stripeSubscriptionId String             @unique
+  stripeCustomerId     String
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  canceledAt           DateTime?
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  metadata             Json?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  // Relations
+  merchant             Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  plan                 Plan               @relation(fields: [planId], references: [id])
+  payments             Payment[]
+
+  @@index([merchantId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model PushToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  Platform
+  deviceId  String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("push_tokens")
+}
+
+model WebPushSubscription {
+  id        String   @id @default(uuid())
+  endpoint  String   @unique
+  keys      Json     // { p256dh, auth }
+  userId    String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("web_push_subscriptions")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String           @db.Text
+  data      Json?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  // Relations
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model Favorite {
+  id         String   @id @default(uuid())
+  userId     String
+  campaignId String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, campaignId])
+  @@index([userId])
+  @@index([campaignId])
+  @@map("favorites")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  changes   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
