@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { QrReader } from 'react-qr-reader';
 import api from '@/services/api';
 
 export default function ValidateCouponPage() {
@@ -6,6 +7,7 @@ export default function ValidateCouponPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
 
   const handleValidate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,8 +27,40 @@ export default function ValidateCouponPage() {
   };
 
   const handleScanQR = () => {
-    // TODO: Implement QR scanner using a library like react-qr-reader
-    alert('Scanner QR - Implementar com biblioteca de scanner');
+    setShowScanner(true);
+    setError('');
+  };
+
+  const handleScan = (result: any) => {
+    if (result) {
+      try {
+        // Try to parse QR code data (could be JSON or plain code)
+        const data = typeof result === 'string' ? result : result.text;
+
+        // If it's JSON, extract the code
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.code) {
+            setCode(parsed.code);
+            setShowScanner(false);
+            return;
+          }
+        } catch {
+          // Not JSON, use as-is
+        }
+
+        // Use the scanned data directly as code
+        setCode(data.toUpperCase());
+        setShowScanner(false);
+      } catch (err) {
+        setError('Erro ao processar QR code');
+      }
+    }
+  };
+
+  const handleScanError = (error: any) => {
+    console.error('QR Scanner Error:', error);
+    setError('Erro ao acessar a câmera. Verifique as permissões.');
   };
 
   return (
@@ -165,6 +199,42 @@ export default function ValidateCouponPage() {
           Você pode adicionar um atalho na tela inicial do seu dispositivo para acesso rápido.
         </p>
       </div>
+
+      {/* QR Scanner Modal */}
+      {showScanner && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
+          onClick={() => setShowScanner(false)}
+        >
+          <div
+            className="bg-white rounded-lg p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Escanear QR Code</h2>
+              <button
+                onClick={() => setShowScanner(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <QrReader
+                constraints={{ facingMode: 'environment' }}
+                onResult={handleScan}
+                containerStyle={{ width: '100%' }}
+                videoStyle={{ width: '100%' }}
+              />
+            </div>
+
+            <p className="text-sm text-gray-600 text-center">
+              Posicione o QR code do cupom dentro do quadro
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

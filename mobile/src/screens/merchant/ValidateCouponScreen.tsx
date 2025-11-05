@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,26 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Modal,
 } from 'react-native';
+import { BarCodeScanner } from 'expo-barcode-scanner';
 import api from '../../services/api';
 
 export default function ValidateCouponScreen() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [scanned, setScanned] = useState(false);
+
+  useEffect(() => {
+    const getCameraPermission = async () => {
+      const { status } = await BarCodeScanner.requestPermissionsAsync();
+      setHasPermission(status === 'granted');
+    };
+    getCameraPermission();
+  }, []);
 
   const handleValidate = async () => {
     if (!code.trim()) {
@@ -35,8 +48,43 @@ export default function ValidateCouponScreen() {
   };
 
   const handleScanQR = () => {
-    // TODO: Implement QR scanner using expo-camera or expo-barcode-scanner
-    Alert.alert('Scanner QR', 'Funcionalidade de scanner QR em desenvolvimento');
+    if (hasPermission === null) {
+      Alert.alert('Aguarde', 'Verificando permissões de câmera...');
+      return;
+    }
+    if (hasPermission === false) {
+      Alert.alert(
+        'Permissão negada',
+        'É necessário permitir o acesso à câmera para escanear QR codes.'
+      );
+      return;
+    }
+    setScanned(false);
+    setShowScanner(true);
+  };
+
+  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+    setScanned(true);
+
+    try {
+      // Try to parse QR code data (could be JSON or plain code)
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.code) {
+          setCode(parsed.code);
+          setShowScanner(false);
+          return;
+        }
+      } catch {
+        // Not JSON, use as-is
+      }
+
+      // Use the scanned data directly as code
+      setCode(data.toUpperCase());
+      setShowScanner(false);
+    } catch (err) {
+      Alert.alert('Erro', 'Erro ao processar QR code');
+    }
   };
 
   const handleReset = () => {
@@ -155,6 +203,46 @@ export default function ValidateCouponScreen() {
           </View>
         </View>
       </View>
+
+      {/* QR Scanner Modal */}
+      <Modal
+        visible={showScanner}
+        animationType="slide"
+        onRequestClose={() => setShowScanner(false)}
+      >
+        <View style={styles.scannerContainer}>
+          <View style={styles.scannerHeader}>
+            <Text style={styles.scannerTitle}>Escanear QR Code</Text>
+            <TouchableOpacity
+              onPress={() => setShowScanner(false)}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.scannerView}>
+            <BarCodeScanner
+              onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+              style={StyleSheet.absoluteFillObject}
+            />
+            {scanned && (
+              <TouchableOpacity
+                style={styles.scanAgainButton}
+                onPress={() => setScanned(false)}
+              >
+                <Text style={styles.scanAgainText}>Escanear Novamente</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.scannerInstructions}>
+            <Text style={styles.scannerInstructionsText}>
+              Posicione o QR code do cupom dentro do quadro
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -298,5 +386,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  scannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 50,
+    backgroundColor: '#000',
+  },
+  scannerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  closeButton: {
+    padding: 8,
+  },
+  closeButtonText: {
+    fontSize: 28,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  scannerView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanAgainButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  scanAgainText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  scannerInstructions: {
+    padding: 20,
+    backgroundColor: '#000',
+  },
+  scannerInstructionsText: {
+    fontSize: 14,
+    color: '#fff',
+    textAlign: 'center',
   },
 });

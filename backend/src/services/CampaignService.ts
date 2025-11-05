@@ -2,6 +2,7 @@ import { prisma } from '@/config/database';
 import { NotFoundError, ForbiddenError, BadRequestError } from '@/utils/errors';
 import { CampaignStatus, UserRole } from '@prisma/client';
 import { generateUniqueSlug } from '@/utils/slugify';
+import { couponService } from './CouponService';
 
 interface CreateCampaignData {
   merchantId: string;
@@ -346,8 +347,10 @@ export class CampaignService {
       },
     });
 
-    // TODO: Generate coupons, send notifications to followers
-    // await couponService.generateCoupons(campaign.id, campaign.totalQuantity);
+    // Generate coupons for the campaign
+    await couponService.generateCoupons(campaign.id, campaign.totalQuantity);
+
+    // TODO: Send notifications to followers
     // await notificationService.notifyNewCampaign(campaign.id);
 
     return updated;
