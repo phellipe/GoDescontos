@@ -15,6 +15,7 @@ import merchantRoutes from '@/routes/merchant';
 import paymentRoutes from '@/routes/payment';
 import couponRoutes from '@/routes/coupons';
 import pushRoutes from '@/routes/push';
+import analyticsRoutes from '@/routes/analytics';
 import healthRoutes from '@/routes/health';
 
 export function createApp(): Express {
@@ -90,6 +91,7 @@ export function createApp(): Express {
   app.use('/api/auth', authRoutes);
   app.use('/api/campaigns', campaignRoutes);
   app.use('/api/merchant', merchantRoutes);
+  app.use('/api/merchant/analytics', analyticsRoutes);
   app.use('/api/payments', paymentRoutes);
   app.use('/api/coupons', couponRoutes);
   app.use('/api/push', pushRoutes);
