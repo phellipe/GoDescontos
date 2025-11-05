@@ -2,6 +2,7 @@ import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
+import path from 'path';
 import { env } from '@/config/env';
 import { Sentry } from '@/config/sentry';
 import { generalLimiter } from '@/middlewares/rateLimiter';
@@ -17,6 +18,7 @@ import couponRoutes from '@/routes/coupons';
 import pushRoutes from '@/routes/push';
 import analyticsRoutes from '@/routes/analytics';
 import healthRoutes from '@/routes/health';
+import uploadRoutes from '@/routes/uploads';
 
 export function createApp(): Express {
   const app = express();
@@ -63,6 +65,9 @@ export function createApp(): Express {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+  // Serve uploaded files
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
   // Sentry request handler (must be before routes)
   if (env.SENTRY_DSN) {
     app.use(Sentry.Handlers.requestHandler());
@@ -95,6 +100,7 @@ export function createApp(): Express {
   app.use('/api/payments', paymentRoutes);
   app.use('/api/coupons', couponRoutes);
   app.use('/api/push', pushRoutes);
+  app.use('/api/uploads', uploadRoutes);
 
   // API Documentation
   if (env.NODE_ENV === 'development') {

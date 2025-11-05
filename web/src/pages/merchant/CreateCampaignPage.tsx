@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
+import ImageUpload from '@/components/ImageUpload';
 
 export default function CreateCampaignPage() {
   const navigate = useNavigate();
@@ -331,16 +332,11 @@ export default function CreateCampaignPage() {
             </div>
 
             <div>
-              <label className="block text-gray-700 font-medium mb-2">
-                URL da Imagem
-              </label>
-              <input
-                type="url"
-                name="imageUrl"
+              <ImageUpload
                 value={formData.imageUrl}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg"
-                placeholder="https://exemplo.com/imagem.jpg"
+                onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                label="Imagem da Campanha"
+                placeholder="Clique para fazer upload da imagem da campanha"
               />
             </div>
           </div>
