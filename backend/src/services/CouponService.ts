@@ -14,7 +14,7 @@ export class CouponService {
     });
 
     if (!campaign) {
-      throw new NotFoundError('Campaign not found');
+      throw new NotFoundError('Campanha não encontrada');
     }
 
     // Check if coupons already exist
@@ -84,7 +84,7 @@ export class CouponService {
     });
 
     if (!coupon) {
-      throw new NotFoundError('Coupon not found');
+      throw new NotFoundError('Cupom não encontrado');
     }
 
     // Create QR code data (JSON with coupon info)
@@ -146,12 +146,12 @@ export class CouponService {
     });
 
     if (!coupon) {
-      throw new NotFoundError('Coupon not found');
+      throw new NotFoundError('Cupom não encontrado');
     }
 
     // Check ownership
     if (userId && coupon.userId !== userId) {
-      throw new BadRequestError('This coupon does not belong to you');
+      throw new BadRequestError('Este cupom não pertence a você');
     }
 
     // Generate QR code if not exists
@@ -189,7 +189,7 @@ export class CouponService {
     });
 
     if (!availableCoupon) {
-      throw new BadRequestError('No coupons available for this campaign');
+      throw new BadRequestError('Não há cupons disponíveis para esta campanha');
     }
 
     // Reserve coupon
@@ -231,15 +231,15 @@ export class CouponService {
     });
 
     if (!coupon) {
-      throw new NotFoundError('Coupon not found');
+      throw new NotFoundError('Cupom não encontrado');
     }
 
     if (coupon.status === CouponStatus.REDEEMED) {
-      throw new BadRequestError('This coupon has already been redeemed');
+      throw new BadRequestError('Este cupom já foi resgatado');
     }
 
     if (coupon.status === CouponStatus.EXPIRED) {
-      throw new BadRequestError('This coupon has expired');
+      throw new BadRequestError('Este cupom expirou');
     }
 
     if (coupon.expiresAt < new Date()) {
@@ -248,7 +248,7 @@ export class CouponService {
         where: { id: coupon.id },
         data: { status: CouponStatus.EXPIRED },
       });
-      throw new BadRequestError('This coupon has expired');
+      throw new BadRequestError('Este cupom expirou');
     }
 
     // Redeem coupon

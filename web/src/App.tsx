@@ -5,8 +5,10 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import CampaignDetailPage from './pages/CampaignDetailPage';
 import DashboardPage from './pages/DashboardPage';
+import MyCouponsPage from './pages/MyCouponsPage';
 import MerchantDashboardPage from './pages/merchant/MerchantDashboardPage';
 import MerchantCampaignsPage from './pages/merchant/MerchantCampaignsPage';
+import CreateCampaignPage from './pages/merchant/CreateCampaignPage';
 import ValidateCouponPage from './pages/merchant/ValidateCouponPage';
 import CampaignDetailPageMerchant from './pages/merchant/CampaignDetailPage';
 import { useAuthStore } from './stores/authStore';
@@ -55,6 +57,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/my-coupons"
+          element={
+            <ProtectedRoute>
+              <MyCouponsPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Merchant Routes */}
         <Route
@@ -78,6 +88,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="MERCHANT">
               <MerchantCampaignsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/merchant/campaigns/new"
+          element={
+            <ProtectedRoute requiredRole="MERCHANT">
+              <CreateCampaignPage />
             </ProtectedRoute>
           }
         />

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -18,7 +18,7 @@ export default function LoginPage() {
       setAuth(user, accessToken, refreshToken);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || 'Falha no login. Verifique suas credenciais.');
     }
   };
 
@@ -52,6 +52,15 @@ export default function LoginPage() {
             Entrar
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <p className="text-gray-600">
+            Não tem uma conta?{' '}
+            <Link to="/register" className="text-blue-600 hover:underline font-medium">
+              Cadastre-se
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
