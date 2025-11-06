@@ -98,8 +98,8 @@ services:
   # Background Worker
   worker:
     build:
-      context: ./worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: worker/Dockerfile
     container_name: godescontos-worker
     restart: unless-stopped
     environment:
