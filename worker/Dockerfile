@@ -4,7 +4,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package files
-COPY worker/package*.json ./
+COPY worker/package.json worker/package-lock.json ./
 COPY backend/prisma ./prisma/
 
 # Install dependencies
@@ -30,10 +30,10 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
 # Copy package files
-COPY worker/package*.json ./
+COPY worker/package.json worker/package-lock.json ./
 
 # Install production dependencies
-RUN npm ci --only=production && \
+RUN npm ci --omit=dev && \
     npm cache clean --force
 
 # Copy Prisma files
