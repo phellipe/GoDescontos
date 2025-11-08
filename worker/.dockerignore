@@ -1,0 +1,94 @@
+# =============================================================================
+# WORKER .DOCKERIGNORE - Exclude unnecessary files from Docker build context
+# =============================================================================
+# Worker uses Prisma client from backend, so we must be careful about exclusions
+# =============================================================================
+
+# Node modules (will be installed via npm ci)
+node_modules
+npm-debug.log
+yarn-error.log
+# NOTE: package-lock.json is REQUIRED for npm ci - do NOT exclude it
+
+# Build output (will be generated during build)
+dist
+build
+*.tsbuildinfo
+
+# Environment files (NEVER include secrets in image)
+.env
+.env.*
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# Logs
+*.log
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*.swn
+.project
+.classpath
+.settings
+.editorconfig
+
+# Git files
+.git
+.gitignore
+.gitattributes
+.github
+
+# Test and coverage
+coverage
+*.coverage
+.nyc_output
+test-results
+
+# Documentation
+*.md
+README.md
+CONTRIBUTING.md
+CHANGELOG.md
+
+# CI/CD files
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+.circleci
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Prisma migrations (worker only needs schema.prisma)
+# Migrations are handled by backend
+# prisma/migrations
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+.temp
+
+# Editor backups
+*~
+*.bak
+*.backup

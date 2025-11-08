@@ -44,7 +44,7 @@ const envSchema = z.object({
   // VAPID
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
-  VAPID_SUBJECT: z.string().email().optional(),
+  VAPID_SUBJECT: z.string().optional(),
 
   // Email
   EMAIL_FROM: z.string().email(),

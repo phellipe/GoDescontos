@@ -1,6 +1,25 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import {
+  Container,
+  Box,
+  Card,
+  CardContent,
+  TextField,
+  Button,
+  Typography,
+  Alert,
+  Link,
+  Stack,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
+  FormHelperText,
+} from '@mui/material';
+import { PersonAdd as RegisterIcon } from '@mui/icons-material';
 import api from '@/services/api';
+import Layout from '@/components/Layout';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -14,8 +33,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+    const name = e.target.name as string;
+    const value = e.target.value;
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,8 +48,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('A senha deve ter no mínimo 6 caracteres');
+    if (formData.password.length < 8) {
+      setError('A senha deve ter no mínimo 8 caracteres');
       return;
     }
 
@@ -41,8 +62,7 @@ export default function RegisterPage() {
         role: formData.role,
       });
 
-      alert('Cadastro realizado com sucesso! Faça login para continuar.');
-      navigate('/login');
+      navigate('/login', { state: { message: 'Cadastro realizado com sucesso! Faça login para continuar.' } });
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro ao realizar cadastro. Tente novamente.');
     } finally {
@@ -51,109 +71,115 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="container py-16">
-      <div className="max-w-md mx-auto card">
-        <h2 className="text-2xl font-bold mb-2">Criar Conta</h2>
-        <p className="text-gray-600 mb-6">
-          Preencha os dados abaixo para criar sua conta no GoDescontos
-        </p>
+    <Layout>
+      <Container maxWidth="sm">
+        <Box sx={{ py: 8 }}>
+          <Card elevation={3}>
+            <CardContent sx={{ p: 4 }}>
+              <Box sx={{ textAlign: 'center', mb: 3 }}>
+                <RegisterIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+                <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
+                  Criar Conta
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Preencha os dados abaixo para criar sua conta
+                </Typography>
+              </Box>
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
-        )}
+              {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                  {error}
+                </Alert>
+              )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-2">Nome Completo</label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              placeholder="Seu nome completo"
-            />
-          </div>
+              <form onSubmit={handleSubmit}>
+                <Stack spacing={3}>
+                  <TextField
+                    label="Nome Completo"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    fullWidth
+                    autoFocus
+                  />
 
-          <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-2">Email</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              placeholder="seu@email.com"
-            />
-          </div>
+                  <TextField
+                    label="Email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    fullWidth
+                    autoComplete="email"
+                  />
 
-          <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-2">Senha</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              placeholder="Mínimo 6 caracteres"
-              minLength={6}
-            />
-          </div>
+                  <TextField
+                    label="Senha"
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    fullWidth
+                    inputProps={{ minLength: 8 }}
+                    helperText="Mínimo 8 caracteres"
+                  />
 
-          <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-2">Confirmar Senha</label>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              placeholder="Digite a senha novamente"
-            />
-          </div>
+                  <TextField
+                    label="Confirmar Senha"
+                    type="password"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    required
+                    fullWidth
+                  />
 
-          <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">Tipo de Conta</label>
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="USER">Cliente</option>
-              <option value="MERCHANT">Lojista</option>
-            </select>
-            <p className="text-sm text-gray-500 mt-1">
-              {formData.role === 'MERCHANT'
-                ? 'Você poderá criar e gerenciar campanhas de descontos'
-                : 'Você poderá comprar e resgatar cupons de desconto'}
-            </p>
-          </div>
+                  <FormControl fullWidth>
+                    <InputLabel>Tipo de Conta</InputLabel>
+                    <Select
+                      name="role"
+                      value={formData.role}
+                      onChange={handleChange}
+                      label="Tipo de Conta"
+                    >
+                      <MenuItem value="USER">Cliente</MenuItem>
+                      <MenuItem value="MERCHANT">Lojista</MenuItem>
+                    </Select>
+                    <FormHelperText>
+                      {formData.role === 'MERCHANT'
+                        ? 'Você poderá criar e gerenciar campanhas de descontos'
+                        : 'Você poderá comprar e resgatar cupons de desconto'}
+                    </FormHelperText>
+                  </FormControl>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary w-full"
-          >
-            {loading ? 'Cadastrando...' : 'Criar Conta'}
-          </button>
-        </form>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    size="large"
+                    fullWidth
+                    disabled={loading}
+                    sx={{ mt: 2 }}
+                  >
+                    {loading ? 'Cadastrando...' : 'Criar Conta'}
+                  </Button>
+                </Stack>
+              </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-gray-600">
-            Já tem uma conta?{' '}
-            <Link to="/login" className="text-blue-600 hover:underline font-medium">
-              Faça login
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
+              <Box sx={{ mt: 3, textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Já tem uma conta?{' '}
+                  <Link component={RouterLink} to="/login" underline="hover" fontWeight="medium">
+                    Faça login
+                  </Link>
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+      </Container>
+    </Layout>
   );
 }

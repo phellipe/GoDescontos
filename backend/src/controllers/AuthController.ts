@@ -1,30 +1,42 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '@/services/AuthService';
-import { AuthRequest } from '@/middlewares/auth';
+import { AuthenticatedRequest } from '@/types';
+import { BaseController } from './BaseController';
+import {
+  RegisterDTO,
+  LoginDTO,
+  RefreshTokenDTO,
+  VerifyEmailDTO,
+  ForgotPasswordDTO,
+  ResetPasswordDTO,
+} from '@/types';
 
-export class AuthController {
+/**
+ * Authentication Controller
+ *
+ * Handles all authentication-related endpoints including:
+ * - User registration
+ * - Login/logout
+ * - Token refresh
+ * - Email verification
+ * - Password reset
+ */
+export class AuthController extends BaseController {
   /**
    * Register a new user
    * POST /api/auth/register
    */
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { email, password, name, role } = req.body;
-
-      const result = await authService.register({
-        email,
-        password,
-        name,
-        role,
-      });
-
-      res.status(201).json({
-        status: 'success',
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
+    await this.execute(
+      async () => {
+        const dto: RegisterDTO = req.body;
+        const result = await authService.register(dto);
+        this.created(res, result);
+      },
+      req as AuthenticatedRequest,
+      res,
+      next,
+    );
   }
 
   /**
@@ -32,18 +44,17 @@ export class AuthController {
    * POST /api/auth/login
    */
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { email, password } = req.body;
-
-      const result = await authService.login({ email, password });
-
-      res.status(200).json({
-        status: 'success',
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
+    await this.execute(
+      async () => {
+        const dto: LoginDTO = req.body;
+        const result = await authService.login(dto);
+        this.success(res, result);
+        this.logAction(req as AuthenticatedRequest, 'login', { email: dto.email });
+      },
+      req as AuthenticatedRequest,
+      res,
+      next,
+    );
   }
 
   /**
@@ -51,18 +62,16 @@ export class AuthController {
    * POST /api/auth/refresh
    */
   async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { refreshToken } = req.body;
-
-      const result = await authService.refreshToken(refreshToken);
-
-      res.status(200).json({
-        status: 'success',
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
+    await this.execute(
+      async () => {
+        const dto: RefreshTokenDTO = req.body;
+        const result = await authService.refreshToken(dto.refreshToken);
+        this.success(res, result);
+      },
+      req as AuthenticatedRequest,
+      res,
+      next,
+    );
   }
 
   /**
@@ -70,18 +79,16 @@ export class AuthController {
    * POST /api/auth/logout
    */
   async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { refreshToken } = req.body;
-
-      await authService.logout(refreshToken);
-
-      res.status(200).json({
-        status: 'success',
-        message: 'Logged out successfully',
-      });
-    } catch (error) {
-      next(error);
-    }
+    await this.execute(
+      async () => {
+        const dto: RefreshTokenDTO = req.body;
+        await authService.logout(dto.refreshToken);
+        this.message(res, 'Logout realizado com sucesso');
+      },
+      req as AuthenticatedRequest,
+      res,
+      next,
+    );
   }
 
   /**
@@ -89,18 +96,16 @@ export class AuthController {
    * POST /api/auth/verify-email
    */
   async verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { token } = req.body;
-
-      await authService.verifyEmail(token);
-
-      res.status(200).json({
-        status: 'success',
-        message: 'Email verified successfully',
-      });
-    } catch (error) {
-      next(error);
-    }
+    await this.execute(
+      async () => {
+        const dto: VerifyEmailDTO = req.body;
+        await authService.verifyEmail(dto.token);
+        this.message(res, 'Email verificado com sucesso');
+      },
+      req as AuthenticatedRequest,
+      res,
+      next,
+    );
   }
 
   /**
@@ -108,18 +113,16 @@ export class AuthController {
    * POST /api/auth/forgot-password
    */
   async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { email } = req.body;
-
-      await authService.requestPasswordReset(email);
-
-      res.status(200).json({
-        status: 'success',
-        message: 'If the email exists, a reset link has been sent',
-      });
-    } catch (error) {
-      next(error);
-    }
+    await this.execute(
+      async () => {
+        const dto: ForgotPasswordDTO = req.body;
+        await authService.requestPasswordReset(dto.email);
+        this.message(res, 'Se o email existir, um link de recuperação foi enviado');
+      },
+      req as AuthenticatedRequest,
+      res,
+      next,
+    );
   }
 
   /**
@@ -127,34 +130,32 @@ export class AuthController {
    * POST /api/auth/reset-password
    */
   async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { token, password } = req.body;
-
-      await authService.resetPassword(token, password);
-
-      res.status(200).json({
-        status: 'success',
-        message: 'Password reset successfully',
-      });
-    } catch (error) {
-      next(error);
-    }
+    await this.execute(
+      async () => {
+        const dto: ResetPasswordDTO = req.body;
+        await authService.resetPassword(dto.token, dto.password);
+        this.message(res, 'Senha redefinida com sucesso');
+      },
+      req as AuthenticatedRequest,
+      res,
+      next,
+    );
   }
 
   /**
-   * Get current user
+   * Get current authenticated user
    * GET /api/auth/me
    */
-  async me(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      // User is already authenticated via middleware
-      res.status(200).json({
-        status: 'success',
-        data: req.user,
-      });
-    } catch (error) {
-      next(error);
-    }
+  async me(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    await this.execute(
+      async () => {
+        const user = this.getAuthUser(req);
+        this.success(res, user);
+      },
+      req,
+      res,
+      next,
+    );
   }
 }
 

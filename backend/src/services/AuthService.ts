@@ -2,50 +2,47 @@ import { prisma } from '@/config/database';
 import { hashPassword, comparePassword } from '@/utils/password';
 import { generateTokens, verifyRefreshToken, getTokenExpirationDate } from '@/utils/jwt';
 import { AppError, UnauthorizedError, ConflictError } from '@/utils/errors';
-import { UserRole } from '@prisma/client';
-import crypto from 'crypto';
 import { env } from '@/config/env';
+import { REFRESH_TOKEN, TOKEN_EXPIRY } from '@/config/constants';
+import { logger } from '@/config/logger';
+import crypto from 'crypto';
+import {
+  RegisterDTO,
+  LoginDTO,
+  AuthResponse,
+  RefreshTokenResponse,
+  UserResponse,
+} from '@/types/auth.types';
 
-interface RegisterData {
-  email: string;
-  password: string;
-  name: string;
-  role?: UserRole;
-}
-
-interface LoginData {
-  email: string;
-  password: string;
-}
-
-interface AuthResponse {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    role: UserRole;
-    isEmailVerified: boolean;
-  };
-  accessToken: string;
-  refreshToken: string;
-}
-
+/**
+ * Authentication Service
+ *
+ * Handles all authentication-related business logic including:
+ * - User registration with email verification
+ * - Login with credential validation
+ * - Refresh token rotation for security
+ * - Password reset flow
+ * - Email verification
+ */
 export class AuthService {
   /**
    * Register a new user
    */
-  async register(data: RegisterData): Promise<AuthResponse> {
+  async register(dto: RegisterDTO): Promise<AuthResponse> {
+    logger.info({ email: dto.email }, 'User registration attempt');
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email: dto.email },
     });
 
     if (existingUser) {
-      throw new ConflictError('User with this email already exists');
+      logger.warn({ email: dto.email }, 'Registration failed: email already exists');
+      throw new ConflictError('Usuário com este email já existe');
     }
 
     // Hash password
-    const passwordHash = await hashPassword(data.password);
+    const passwordHash = await hashPassword(dto.password);
 
     // Generate verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -53,13 +50,15 @@ export class AuthService {
     // Create user
     const user = await prisma.user.create({
       data: {
-        email: data.email,
+        email: dto.email,
         passwordHash,
-        name: data.name,
-        role: data.role || UserRole.USER,
+        name: dto.name,
+        role: dto.role,
         verificationToken,
       },
     });
+
+    logger.info({ userId: user.id, role: user.role }, 'User registered successfully');
 
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
@@ -74,59 +73,45 @@ export class AuthService {
     });
 
     // TODO: Send verification email
-    // await emailService.sendVerificationEmail(user.email, verificationToken);
+    // await emailQueue.add('send-email', {
+    //   to: user.email,
+    //   subject: 'Verificação de Email',
+    //   template: 'verify-email',
+    //   data: { token: verificationToken }
+    // });
 
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-      },
-      accessToken,
-      refreshToken,
-    };
+    return this.buildAuthResponse(user, accessToken, refreshToken);
   }
 
   /**
-   * Login user
+   * Login user with credentials
    */
-  async login(data: LoginData): Promise<AuthResponse> {
+  async login(dto: LoginDTO): Promise<AuthResponse> {
+    logger.info({ email: dto.email }, 'User login attempt');
+
     // Find user
     const user = await prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email: dto.email },
     });
 
     if (!user) {
-      throw new UnauthorizedError('Invalid credentials');
+      logger.warn({ email: dto.email }, 'Login failed: user not found');
+      throw new UnauthorizedError('Credenciais inválidas');
     }
 
     // Verify password
-    const isValidPassword = await comparePassword(data.password, user.passwordHash);
+    const isValidPassword = await comparePassword(dto.password, user.passwordHash);
 
     if (!isValidPassword) {
-      throw new UnauthorizedError('Invalid credentials');
+      logger.warn({ userId: user.id }, 'Login failed: invalid password');
+      throw new UnauthorizedError('Credenciais inválidas');
     }
 
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
 
-    // Revoke old refresh tokens (keep only last 5)
-    const oldTokens = await prisma.refreshToken.findMany({
-      where: { userId: user.id, isRevoked: false },
-      orderBy: { createdAt: 'desc' },
-      skip: 4,
-    });
-
-    if (oldTokens.length > 0) {
-      await prisma.refreshToken.updateMany({
-        where: {
-          id: { in: oldTokens.map((t) => t.id) },
-        },
-        data: { isRevoked: true },
-      });
-    }
+    // Revoke old refresh tokens (keep only last N)
+    await this.revokeOldRefreshTokens(user.id);
 
     // Store new refresh token
     await prisma.refreshToken.create({
@@ -143,23 +128,15 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-      },
-      accessToken,
-      refreshToken,
-    };
+    logger.info({ userId: user.id }, 'User logged in successfully');
+
+    return this.buildAuthResponse(user, accessToken, refreshToken);
   }
 
   /**
-   * Refresh access token
+   * Refresh access token with token rotation
    */
-  async refreshToken(token: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async refreshToken(token: string): Promise<RefreshTokenResponse> {
     // Verify refresh token
     let payload;
     try {
@@ -301,8 +278,54 @@ export class AuthService {
     });
 
     // Revoke all refresh tokens
+    await this.revokeAllRefreshTokens(user.id);
+
+    logger.info({ userId: user.id }, 'Password reset successfully');
+  }
+
+  /**
+   * Build auth response with user data and tokens
+   */
+  private buildAuthResponse(user: any, accessToken: string, refreshToken: string): AuthResponse {
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+      },
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  /**
+   * Revoke old refresh tokens (keep only last N)
+   */
+  private async revokeOldRefreshTokens(userId: string): Promise<void> {
+    const oldTokens = await prisma.refreshToken.findMany({
+      where: { userId, isRevoked: false },
+      orderBy: { createdAt: 'desc' },
+      skip: REFRESH_TOKEN.MAX_ACTIVE_TOKENS - 1,
+    });
+
+    if (oldTokens.length > 0) {
+      await prisma.refreshToken.updateMany({
+        where: {
+          id: { in: oldTokens.map((t) => t.id) },
+        },
+        data: { isRevoked: true },
+      });
+    }
+  }
+
+  /**
+   * Revoke all refresh tokens for a user
+   */
+  private async revokeAllRefreshTokens(userId: string): Promise<void> {
     await prisma.refreshToken.updateMany({
-      where: { userId: user.id },
+      where: { userId },
       data: { isRevoked: true },
     });
   }

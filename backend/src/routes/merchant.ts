@@ -6,6 +6,7 @@ import { AuthRequest } from '@/middlewares/auth';
 import { Response, NextFunction } from 'express';
 import { campaignService } from '@/services/CampaignService';
 import { UserRole } from '@prisma/client';
+import { campaignSchemas } from '@/schemas/campaign.schema';
 
 const router = Router();
 
@@ -64,6 +65,7 @@ router.post(
 router.patch(
   '/campaigns/:id',
   authorize(UserRole.MERCHANT, UserRole.ADMIN),
+  validate(campaignSchemas.update),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const campaign = await campaignService.update(
@@ -142,6 +144,24 @@ router.get(
         status: 'success',
         data: result.campaigns,
         pagination: result.pagination,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Get campaign by ID (merchant only - includes sensitive data)
+router.get(
+  '/campaigns/:id',
+  authorize(UserRole.MERCHANT, UserRole.ADMIN),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const campaign = await campaignService.getById(req.params.id);
+
+      res.status(200).json({
+        status: 'success',
+        data: campaign,
       });
     } catch (error) {
       next(error);

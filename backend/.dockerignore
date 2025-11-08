@@ -1,16 +1,105 @@
+# =============================================================================
+# BACKEND .DOCKERIGNORE - Exclude unnecessary files from Docker build context
+# =============================================================================
+# This file reduces build context size and improves build speed by excluding
+# files that are not needed in the Docker image
+# =============================================================================
+
+# Node modules (will be installed via npm ci)
 node_modules
-dist
 npm-debug.log
+yarn-error.log
+# NOTE: package-lock.json is REQUIRED for npm ci - do NOT exclude it
+
+# Build output (will be generated during build)
+dist
+build
+*.tsbuildinfo
+
+# Environment files (NEVER include secrets in image)
 .env
+.env.*
 .env.local
 .env.*.local
+.env.development
+.env.test
+.env.production
+
+# Logs
 *.log
-.git
-.gitignore
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
 .vscode
 .idea
+*.swp
+*.swo
+*.swn
+.project
+.classpath
+.settings
+.editorconfig
+
+# Git files
+.git
+.gitignore
+.gitattributes
+.github
+
+# Test and coverage
 coverage
-.DS_Store
+*.coverage
+.nyc_output
+test-results
+.vitest
+
+# Documentation (not needed in image, but keep CLAUDE.md for reference if wanted)
+# Comment out the ones you want to include
+*.md
+!CLAUDE.md  # Keep CLAUDE.md for deployment reference
+README.md
+CONTRIBUTING.md
+CHANGELOG.md
+
+# CI/CD files
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+.circleci
+
+# Docker files (no need to copy Docker files into image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Husky and Git hooks
+.husky
+
+# Prisma (only schema.prisma is needed, copied explicitly in Dockerfile)
+# Exclude migrations from final image (only needed for migrate deploy)
+# prisma/migrations
+
+# Uploads (will be mounted as volume in development)
 uploads/*
 !uploads/.gitkeep
-*.md
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+.temp
+
+# Editor backups
+*~
+*.bak
+*.backup

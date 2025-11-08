@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, authorize } from '@/middlewares/auth';
 import { AuthRequest } from '@/middlewares/auth';
 import { stripeService } from '@/services/StripeService';
@@ -46,7 +46,7 @@ router.post(
 router.post(
   '/webhook',
   // Use raw body for webhook signature verification
-  Router().raw({ type: 'application/json' }),
+  express.raw({ type: 'application/json' }),
   async (req: Request, res: Response, next: NextFunction) => {
     const sig = req.headers['stripe-signature'] as string;
 

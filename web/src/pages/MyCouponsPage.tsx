@@ -1,193 +1,466 @@
-import { useQuery } from 'react-query';
 import { useState } from 'react';
+import { useQuery } from 'react-query';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  CardMedia,
+  Button,
+  Skeleton,
+  Alert,
+  Chip,
+  Tabs,
+  Tab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Divider,
+} from '@mui/material';
+import {
+  QrCode as QrCodeIcon,
+  CheckCircle as CheckIcon,
+  Cancel as CancelIcon,
+  Schedule as ScheduleIcon,
+  LocationOn as LocationIcon,
+  Phone as PhoneIcon,
+  Close as CloseIcon,
+  Explore as ExploreIcon,
+} from '@mui/icons-material';
 import api from '@/services/api';
+import Layout from '@/components/Layout';
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`coupon-tabpanel-${index}`}
+      aria-labelledby={`coupon-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+  );
+}
 
 export default function MyCouponsPage() {
+  const navigate = useNavigate();
   const [selectedCoupon, setSelectedCoupon] = useState<any>(null);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [tabValue, setTabValue] = useState(0);
 
   const { data: coupons, isLoading } = useQuery('myCoupons', async () => {
     const response = await api.get('/coupons/my');
     return response.data.data;
   });
 
-  const handleShowQR = async (couponId: string) => {
+  const handleShowQR = async (coupon: any) => {
     try {
-      const response = await api.get(`/coupons/${couponId}/qr`);
+      const response = await api.get(`/coupons/${coupon.id}/qr`);
       setSelectedCoupon(response.data.data);
+      setQrDialogOpen(true);
     } catch (error) {
       console.error('Error loading QR code:', error);
     }
   };
 
-  if (isLoading) {
+  const handleCloseQR = () => {
+    setQrDialogOpen(false);
+    setSelectedCoupon(null);
+  };
+
+  const activeCoupons = coupons?.filter((c: any) =>
+    c.status === 'RESERVED' && new Date(c.expiresAt) > new Date()
+  ) || [];
+
+  const usedCoupons = coupons?.filter((c: any) => c.status === 'REDEEMED') || [];
+
+  const expiredCoupons = coupons?.filter((c: any) =>
+    c.status === 'RESERVED' && new Date(c.expiresAt) <= new Date()
+  ) || [];
+
+  const renderCouponCard = (coupon: any) => {
+    const isExpired = new Date(coupon.expiresAt) < new Date();
+    const isRedeemed = coupon.status === 'REDEEMED';
+
     return (
-      <div className="container py-8">
-        <p>Carregando...</p>
-      </div>
+      <Grid item xs={12} md={6} key={coupon.id}>
+        <Card
+          sx={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            transition: 'all 0.2s',
+            opacity: isExpired || isRedeemed ? 0.7 : 1,
+            '&:hover': {
+              transform: isExpired || isRedeemed ? 'none' : 'translateY(-4px)',
+              boxShadow: isExpired || isRedeemed ? 1 : 4,
+            },
+          }}
+        >
+          <CardMedia
+            component="div"
+            sx={{
+              height: 180,
+              bgcolor: 'grey.200',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundImage: coupon.campaign.imageUrl ? `url(${coupon.campaign.imageUrl})` : 'none',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              position: 'relative',
+            }}
+          >
+            {!coupon.campaign.imageUrl && (
+              <Typography variant="h2">🎫</Typography>
+            )}
+
+            {/* Status Badge */}
+            <Chip
+              label={isRedeemed ? 'Usado' : isExpired ? 'Expirado' : 'Disponível'}
+              color={isRedeemed ? 'success' : isExpired ? 'error' : 'primary'}
+              sx={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                fontWeight: 'bold',
+              }}
+            />
+          </CardMedia>
+
+          <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+            {/* Title and Merchant */}
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              {coupon.campaign.title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              {coupon.campaign.merchant.name}
+            </Typography>
+
+            {/* Price */}
+            <Box sx={{ my: 2 }}>
+              <Typography variant="h4" color="success.main" fontWeight="bold">
+                R$ {Number(coupon.campaign.pricePromo).toFixed(2)}
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ textDecoration: 'line-through' }}
+              >
+                R$ {Number(coupon.campaign.priceOriginal).toFixed(2)}
+              </Typography>
+            </Box>
+
+            <Divider sx={{ my: 2 }} />
+
+            {/* Coupon Info */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <QrCodeIcon fontSize="small" color="action" />
+                <Typography variant="body2" color="text.secondary">
+                  Código: <strong>{coupon.code}</strong>
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ScheduleIcon fontSize="small" color="action" />
+                <Typography variant="body2" color="text.secondary">
+                  Válido até: {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}
+                </Typography>
+              </Box>
+
+              {isRedeemed && coupon.redeemedAt && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CheckIcon fontSize="small" color="success" />
+                  <Typography variant="body2" color="success.main">
+                    Usado em: {new Date(coupon.redeemedAt).toLocaleString('pt-BR')}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            {/* Action Button */}
+            <Box sx={{ mt: 'auto' }}>
+              {!isRedeemed && !isExpired ? (
+                <Button
+                  variant="contained"
+                  fullWidth
+                  startIcon={<QrCodeIcon />}
+                  onClick={() => handleShowQR(coupon)}
+                >
+                  Mostrar QR Code
+                </Button>
+              ) : (
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  disabled
+                  startIcon={isRedeemed ? <CheckIcon /> : <CancelIcon />}
+                >
+                  {isRedeemed ? 'Cupom Usado' : 'Cupom Expirado'}
+                </Button>
+              )}
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
     );
-  }
+  };
 
   return (
-    <div className="container py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Meus Cupons</h1>
+    <Layout>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        {/* Header */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            Meus Cupons
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Gerencie todos os seus cupons de desconto
+          </Typography>
+        </Box>
 
-      {!coupons || coupons.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-gray-500 mb-4">Você ainda não tem cupons.</p>
-          <a href="/" className="btn btn-primary inline-block">
-            Ver Promoções
-          </a>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {coupons.map((coupon: any) => {
-            const isExpired = new Date(coupon.expiresAt) < new Date();
-            const isRedeemed = coupon.status === 'REDEEMED';
+        {/* Stats Cards */}
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={4}>
+            <Card sx={{ bgcolor: 'primary.main', color: 'white' }}>
+              <CardContent>
+                <Typography variant="h3" fontWeight="bold">
+                  {activeCoupons.length}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Cupons Ativos
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Card sx={{ bgcolor: 'success.main', color: 'white' }}>
+              <CardContent>
+                <Typography variant="h3" fontWeight="bold">
+                  {usedCoupons.length}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Cupons Usados
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Card sx={{ bgcolor: 'error.main', color: 'white' }}>
+              <CardContent>
+                <Typography variant="h3" fontWeight="bold">
+                  {expiredCoupons.length}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Cupons Expirados
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
 
-            return (
-              <div key={coupon.id} className="card">
-                <div className="flex gap-6">
-                  {/* Campaign Image */}
-                  <div className="w-32 h-32 bg-gray-200 rounded-lg flex-shrink-0">
-                    {coupon.campaign.imageUrl ? (
-                      <img
-                        src={coupon.campaign.imageUrl}
-                        alt={coupon.campaign.title}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        🎫
-                      </div>
-                    )}
-                  </div>
+        {/* Tabs */}
+        <Card>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs
+              value={tabValue}
+              onChange={(_, newValue) => setTabValue(newValue)}
+              aria-label="coupon tabs"
+            >
+              <Tab label={`Ativos (${activeCoupons.length})`} />
+              <Tab label={`Usados (${usedCoupons.length})`} />
+              <Tab label={`Expirados (${expiredCoupons.length})`} />
+            </Tabs>
+          </Box>
 
-                  {/* Coupon Info */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          {coupon.campaign.title}
-                        </h3>
-                        <p className="text-sm text-gray-600">{coupon.campaign.merchant.name}</p>
-                      </div>
-                      <span
-                        className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                          isRedeemed
-                            ? 'bg-green-100 text-green-800'
-                            : isExpired
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-blue-100 text-blue-800'
-                        }`}
-                      >
-                        {isRedeemed ? 'Usado' : isExpired ? 'Expirado' : 'Disponível'}
-                      </span>
-                    </div>
+          {/* Loading State */}
+          {isLoading ? (
+            <Box sx={{ p: 3 }}>
+              <Grid container spacing={3}>
+                {[1, 2, 3, 4].map((i) => (
+                  <Grid item xs={12} md={6} key={i}>
+                    <Skeleton variant="rectangular" height={350} sx={{ borderRadius: 2 }} />
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          ) : (
+            <>
+              {/* Active Coupons */}
+              <TabPanel value={tabValue} index={0}>
+                {activeCoupons.length === 0 ? (
+                  <Alert severity="info" icon={<ExploreIcon />}>
+                    Você não tem cupons ativos no momento. Explore as promoções disponíveis!
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => navigate('/')}
+                      sx={{ ml: 2 }}
+                    >
+                      Ver Promoções
+                    </Button>
+                  </Alert>
+                ) : (
+                  <Grid container spacing={3}>
+                    {activeCoupons.map(renderCouponCard)}
+                  </Grid>
+                )}
+              </TabPanel>
 
-                    <div className="mb-3">
-                      <div className="text-2xl font-bold text-green-600">
-                        R$ {Number(coupon.campaign.pricePromo).toFixed(2)}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Valor original: R$ {Number(coupon.campaign.priceOriginal).toFixed(2)}
-                      </div>
-                    </div>
+              {/* Used Coupons */}
+              <TabPanel value={tabValue} index={1}>
+                {usedCoupons.length === 0 ? (
+                  <Alert severity="info">
+                    Você ainda não usou nenhum cupom.
+                  </Alert>
+                ) : (
+                  <Grid container spacing={3}>
+                    {usedCoupons.map(renderCouponCard)}
+                  </Grid>
+                )}
+              </TabPanel>
 
-                    <div className="mb-3">
-                      <div className="text-sm text-gray-600">
-                        <strong>Código:</strong> <span className="font-mono">{coupon.code}</span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <strong>Válido até:</strong>{' '}
-                        {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}
-                      </div>
-                      {isRedeemed && coupon.redeemedAt && (
-                        <div className="text-sm text-green-600">
-                          <strong>Usado em:</strong>{' '}
-                          {new Date(coupon.redeemedAt).toLocaleString('pt-BR')}
-                        </div>
-                      )}
-                    </div>
+              {/* Expired Coupons */}
+              <TabPanel value={tabValue} index={2}>
+                {expiredCoupons.length === 0 ? (
+                  <Alert severity="success">
+                    Você não tem cupons expirados. Continue aproveitando suas promoções!
+                  </Alert>
+                ) : (
+                  <Grid container spacing={3}>
+                    {expiredCoupons.map(renderCouponCard)}
+                  </Grid>
+                )}
+              </TabPanel>
+            </>
+          )}
+        </Card>
+      </Container>
 
-                    {!isRedeemed && !isExpired && (
-                      <button
-                        onClick={() => handleShowQR(coupon.id)}
-                        className="btn btn-primary"
-                      >
-                        Mostrar QR Code
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* QR Code Dialog */}
+      <Dialog
+        open={qrDialogOpen}
+        onClose={handleCloseQR}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" fontWeight="bold">
+              QR Code do Cupom
+            </Typography>
+            <IconButton onClick={handleCloseQR} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
 
-      {/* QR Code Modal */}
-      {selectedCoupon && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-          onClick={() => setSelectedCoupon(null)}
-        >
-          <div
-            className="bg-white rounded-lg p-8 max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-center">
-              <h2 className="text-2xl font-bold mb-4">QR Code do Cupom</h2>
-
+        <DialogContent>
+          {selectedCoupon && (
+            <Box sx={{ textAlign: 'center' }}>
+              {/* QR Code */}
               {selectedCoupon.qrCodeUrl && (
-                <img
+                <Box
+                  component="img"
                   src={selectedCoupon.qrCodeUrl}
                   alt="QR Code"
-                  className="w-full max-w-sm mx-auto mb-4"
+                  sx={{
+                    width: '100%',
+                    maxWidth: 300,
+                    height: 'auto',
+                    mx: 'auto',
+                    mb: 3,
+                    border: '4px solid',
+                    borderColor: 'grey.200',
+                    borderRadius: 2,
+                  }}
                 />
               )}
 
-              <div className="mb-4">
-                <div className="text-lg font-semibold">{selectedCoupon.campaign.title}</div>
-                <div className="text-gray-600">{selectedCoupon.campaign.merchant.name}</div>
-              </div>
+              {/* Campaign Info */}
+              <Typography variant="h6" fontWeight="bold" gutterBottom>
+                {selectedCoupon.campaign.title}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                {selectedCoupon.campaign.merchant.name}
+              </Typography>
 
-              <div className="bg-gray-100 rounded-lg p-4 mb-4">
-                <div className="text-sm text-gray-600">Código do Cupom</div>
-                <div className="text-2xl font-mono font-bold">{selectedCoupon.code}</div>
-              </div>
+              {/* Coupon Code */}
+              <Card sx={{ bgcolor: 'grey.100', my: 3, p: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Código do Cupom
+                </Typography>
+                <Typography variant="h5" fontWeight="bold" sx={{ fontFamily: 'monospace' }}>
+                  {selectedCoupon.code}
+                </Typography>
+              </Card>
 
-              <div className="text-3xl font-bold text-green-600 mb-4">
+              {/* Price */}
+              <Typography variant="h3" color="success.main" fontWeight="bold" gutterBottom>
                 R$ {Number(selectedCoupon.campaign.pricePromo).toFixed(2)}
-              </div>
+              </Typography>
 
-              <div className="text-sm text-gray-600 mb-6">
-                <p className="mb-2">
-                  <strong>Endereço:</strong> {selectedCoupon.campaign.merchant.city},{' '}
-                  {selectedCoupon.campaign.merchant.state}
-                </p>
+              <Divider sx={{ my: 3 }} />
+
+              {/* Merchant Details */}
+              <Box sx={{ textAlign: 'left' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <LocationIcon color="action" />
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Endereço
+                    </Typography>
+                    <Typography variant="body1">
+                      {selectedCoupon.campaign.merchant.city},{' '}
+                      {selectedCoupon.campaign.merchant.state}
+                    </Typography>
+                  </Box>
+                </Box>
+
                 {selectedCoupon.campaign.merchant.phone && (
-                  <p>
-                    <strong>Telefone:</strong> {selectedCoupon.campaign.merchant.phone}
-                  </p>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <PhoneIcon color="action" />
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Telefone
+                      </Typography>
+                      <Typography variant="body1">
+                        {selectedCoupon.campaign.merchant.phone}
+                      </Typography>
+                    </Box>
+                  </Box>
                 )}
-              </div>
+              </Box>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-yellow-800">
-                  📱 Mostre este QR code ou o código ao estabelecimento para resgatar seu cupom.
-                </p>
-              </div>
+              {/* Instructions */}
+              <Alert severity="info" sx={{ mt: 3, textAlign: 'left' }}>
+                Mostre este QR code ou o código ao estabelecimento para resgatar seu cupom.
+              </Alert>
+            </Box>
+          )}
+        </DialogContent>
 
-              <button
-                onClick={() => setSelectedCoupon(null)}
-                className="btn btn-primary w-full"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+        <DialogActions>
+          <Button onClick={handleCloseQR} variant="contained" fullWidth>
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Layout>
   );
 }

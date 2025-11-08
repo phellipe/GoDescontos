@@ -2,6 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
   provider = "prisma-client-js"
 }
 
@@ -196,7 +197,6 @@ model Campaign {
   @@index([startAt, endAt])
   @@index([city, state])
   @@index([city, state, category])
-  @@fulltext([title, description])
   @@map("campaigns")
 }
 

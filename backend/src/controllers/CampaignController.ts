@@ -1,79 +1,89 @@
 import { Response, NextFunction } from 'express';
 import { campaignService } from '@/services/CampaignService';
-import { AuthRequest } from '@/middlewares/auth';
+import { AuthenticatedRequest, CampaignListFilter } from '@/types';
+import { BaseController } from './BaseController';
 
-export class CampaignController {
+/**
+ * Campaign Controller
+ *
+ * Handles public campaign-related endpoints including:
+ * - List campaigns with filters
+ * - Get campaign details
+ * - Toggle favorite campaigns
+ */
+export class CampaignController extends BaseController {
   /**
-   * List campaigns
+   * List campaigns with filters and pagination
    * GET /api/campaigns
    */
-  async list(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { city, state, category, search, status, merchantId, isFeatured, page, limit } = req.query;
+  async list(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    await this.execute(
+      async () => {
+        const filters: CampaignListFilter = {
+          city: req.query.city as string,
+          state: req.query.state as string,
+          category: req.query.category as string,
+          search: req.query.search as string,
+          status: req.query.status as any,
+          merchantId: req.query.merchantId as string,
+          isFeatured: req.query.isFeatured === 'true',
+          page: req.query.page ? parseInt(req.query.page as string) : undefined,
+          limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+        };
 
-      const result = await campaignService.list({
-        city: city as string,
-        state: state as string,
-        category: category as string,
-        search: search as string,
-        status: status as any,
-        merchantId: merchantId as string,
-        isFeatured: isFeatured === 'true',
-        page: page ? parseInt(page as string) : undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-      });
+        const result = await campaignService.list(filters);
 
-      res.status(200).json({
-        status: 'success',
-        data: result.campaigns,
-        pagination: result.pagination,
-      });
-    } catch (error) {
-      next(error);
-    }
+        this.paginated(res, result.campaigns, result.pagination);
+      },
+      req,
+      res,
+      next,
+    );
   }
 
   /**
-   * Get campaign by ID
+   * Get campaign by ID or slug
    * GET /api/campaigns/:id
    */
-  async getById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const incrementView = req.query.incrementView === 'true';
+  async getById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    await this.execute(
+      async () => {
+        const { id } = req.params;
+        const incrementView = req.query.incrementView === 'true';
 
-      const campaign = await campaignService.getById(id, incrementView);
+        const campaign = await campaignService.getById(id, incrementView);
 
-      res.status(200).json({
-        status: 'success',
-        data: campaign,
-      });
-    } catch (error) {
-      next(error);
-    }
+        this.success(res, campaign);
+      },
+      req,
+      res,
+      next,
+    );
   }
 
   /**
-   * Toggle favorite
+   * Toggle favorite campaign
    * POST /api/campaigns/:id/favorite
    */
-  async toggleFavorite(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      if (!req.user) {
-        throw new Error('Unauthorized');
-      }
+  async toggleFavorite(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    await this.execute(
+      async () => {
+        const { id } = req.params;
+        const userId = this.getUserId(req);
 
-      const { id } = req.params;
+        const result = await campaignService.toggleFavorite(id, userId);
 
-      const result = await campaignService.toggleFavorite(id, req.user.userId);
-
-      res.status(200).json({
-        status: 'success',
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
+        this.success(res, result);
+        this.logAction(req, 'toggle_favorite', { campaignId: id });
+      },
+      req,
+      res,
+      next,
+    );
   }
 }
 

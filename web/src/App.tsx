@@ -40,7 +40,7 @@ function App() {
   }, [isAuthenticated]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh' }}>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<HomePage />} />
@@ -92,7 +92,15 @@ function App() {
           }
         />
         <Route
-          path="/merchant/campaigns/new"
+          path="/merchant/campaigns/create"
+          element={
+            <ProtectedRoute requiredRole="MERCHANT">
+              <CreateCampaignPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/merchant/campaigns/:id/edit"
           element={
             <ProtectedRoute requiredRole="MERCHANT">
               <CreateCampaignPage />
